@@ -3,23 +3,36 @@ from socket import *
 
 BUFSIZE = 1024
 
-def main():
-	if len(sys.argv) < 4:
-		usage()
-		bindport = eval(sys.argv[1])
-	else:
-		bindport = 8080
-	host = sys.argv[2]
-	if len(sys.argv) > 4:
-		port = eval(sys.argv[3])
-		fileName = sys.argv[4]
-	addr = host, port
-	s = socket(AF_INET, SOCK_DGRAM)
-	s.bind(('', bindport))
-	print 'udp echo client ready, reading stdin'
-	connect(s, addr)
-	recieve(fileName, s, addr)
+# def main():
+# 	if len(sys.argv) < 4:
+# 		usage()
+# 		bindport = eval(sys.argv[1])
+# 	else:
+# 		bindport = 8080
+# 	host = sys.argv[2]
+# 	if len(sys.argv) > 4:
+# 		port = eval(sys.argv[3])
+# 		fileName = sys.argv[4]
+# 	addr = host, port
+# 	s = socket(AF_INET, SOCK_DGRAM)
+# 	s.bind(('', bindport))
+# 	print 'udp echo client ready, reading stdin'
+# 	connect(s, addr)
+# 	recieve(fileName, s, addr)
 	
+def connect(s, addr):
+	sendThis("SYN", addr, s)
+	# add time out
+	data, fromaddr = s.recvfrom(BUFSIZE)
+	print 'client received', `data`, 'from', `fromaddr`
+	# check sequencenumber
+	if(data == "SYNACK" and addr == fromaddr):
+		sendThis("ACK", addr, s)
+		return addr
+	else:
+		return 0
+
+
 def recieve(fileName, s, addr):
 	sendThis("GET" + "_" + fileName, addr, s)
 	file = open(fileName, 'wb')
@@ -34,16 +47,6 @@ def recieve(fileName, s, addr):
 			s.close()
 			break
 	print("done recieving")
-
-
-def connect(s, addr):
-	sendThis("SYN", addr, s)
-	data, fromaddr = s.recvfrom(BUFSIZE)
-	print 'client received', `data`, 'from', `fromaddr`
-	# check sequencenumber
-	if(data == "SYNACK" and addr == fromaddr):
-		sendThis("ACK", addr, s)
-
 
 
 def sendThis(line, addr, s):
@@ -61,7 +64,7 @@ def usage():
 
 
 
-main()
+# main()
 
 
 
