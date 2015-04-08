@@ -4,6 +4,7 @@ import os.path
 
 
 BUFSIZE = 1024
+seqNum = 1000
 
 # def main():
 # 	if len(sys.argv) > 2:
@@ -23,22 +24,21 @@ BUFSIZE = 1024
 
 
 def start(s):
+	global seqNum
 	while 1:
 		data, addr = s.recvfrom(BUFSIZE)
 		print 'server received', `data`, 'from', `addr`
 		if(data == "SYN"):
-			data +="ACK"
+			data +="ACK_" + `seqNum`
 			conAddr = addr
 			s.sendto(data, addr)
-		if(data == "ACK" and addr == conAddr):
+		elif(data[:3] == "ACK" and eval(data[4:]) == seqNum):
 			print("successfully conencted to", `conAddr`)
-			while 1:
-				data, addr = s.recvfrom(BUFSIZE)
-				if(data[:3] == "GET"):
-					fileName = data[4:]
- 					send(fileName, s, addr)
- 				else:
- 					print "unknown request"
+		elif(data[:3] == "GET"):
+			fileName = data[4:]
+			send(fileName, s, addr)
+		else:
+			print "unknown request"
 
 def send(fileName, s, addr):
 	if(os.path.isfile(fileName)):
@@ -48,20 +48,22 @@ def send(fileName, s, addr):
 		return
 	nxtPkt = file.read(BUFSIZE)
 	while(nxtPkt):
-		sendThis(nxtPkt, addr, s)
+		sendLine(nxtPkt, addr, s)
 		data, fromaddr = s.recvfrom(BUFSIZE)
 		print 'server received', `data`, 'from', `fromaddr`
 		#check sequence# and retransmit if necessary
 		if(data == "ACK"):
 			nxtPkt = file.read(BUFSIZE)
-	sendThis("DONE", addr, s)
+	s.sendto("DONE", addr)
 	file.close()
-	s.close()
 
 
-def sendThis(line, addr, s):
+def sendLine(line, addr, s):
+	global seqNum
+	seqNum = seqNum + 1
 	print 'server sending data to', `addr`
-	s.sendto(line, addr)
+	s.sendto(`seqNum` + line, addr)
+
 
 
 

@@ -3,7 +3,7 @@ import os.path
 from socket import *
 import RxPClient
 
-status = "NO CONNECTION"
+status = "NO_CONNECTION"
 
 def main():
 	if len(sys.argv) < 3:
@@ -18,14 +18,14 @@ def main():
 		line = sys.stdin.readline().strip()
 		if not line:
 			break
-		if(line == "connect"):
+		elif(line == "connect"):
 			tcpConnect(s, addr)
-		if(line[:3] == "get"):
+		elif(line[:3] == "get"):
 			get(line[4:].strip(), s, addr)
-		if (line[:4] == "post"):
+		elif (line[:4] == "post"):
 			post(line[4:].strip(), s, addr)
-		if (line == "disconnect"):
-			disconnect()
+		elif (line == "disconnect"):
+			disconnect(s)
 		else:
 			usage(2)
 
@@ -33,7 +33,7 @@ def usage(errorNum):
 	sys.stdout = sys.stderr
 	if(errorNum == 1):
 		print 'Usage: FxAServer X A P'
-		print 'X: the Even port # for FxASevers socket'
+		print 'X: the Even port # for FxAClient socket'
 		print 'A: the IP address of NetEmu'
 	 	print 'P: the UDP port number of NetEmu'
 	 	sys.exit(2)
@@ -42,19 +42,23 @@ def usage(errorNum):
 	
 
 def tcpConnect(s, addr):
-	print("attempting to connect")
-	if(RxPClient.connect(s, addr)):
-		status = "CONNECTED"
-		print(status + "connected to server at " + `addr`)
+	global status
+	if(status == "NO_CONNECTION"):
+		if(RxPClient.connect(s, addr)):
+			status = "CONNECTED"
+			print(status + "connected to server at " + `addr`)
+	else:
+		print "connection already exists"
 		
 
 
 def get(fileName, s, addr):
-	# if(status == "CONNECTED"):
-	RxPClient.recieve(fileName, s, addr)
-	# else:
-	# 	print("Need to establish a connection first!")
-	# 	return
+	print("on get the value of status is: " + status)
+	if(status == "CONNECTED"):
+		RxPClient.recieve(fileName, s, addr)
+	else:
+		print("Need to establish a connection first!")
+		return
 
 def post(fileName, s, addr):
 	if(status == "CONNECTED"):
@@ -68,7 +72,10 @@ def post(fileName, s, addr):
 		print("Need to establish a connection first!")
 		return
 
-def disconnect():
-	status = "NO CONNECTION"
+def disconnect(s):
+	global status
+	status = "NO_CONNECTION"
+	s.close()	
+	sys.exit(2)
 
 main()

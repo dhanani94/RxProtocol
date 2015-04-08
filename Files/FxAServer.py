@@ -10,6 +10,16 @@ def main():
 		s = socket(AF_INET, SOCK_DGRAM)
 		s.bind(('', port))
 		RxPServer.start(s)
+	while 1:
+		line = sys.stdin.readline().strip()
+		if not line:
+			break
+		if(line == "terminate"):
+			terminate(s)
+			return
+		else:
+			print "command not understood!"
+
 		
 def usage():
 	sys.stdout = sys.stderr
@@ -19,7 +29,8 @@ def usage():
  	print 'P: the UDP port number of NetEmu'
 	sys.exit(2)
 
-def terminate():
-	pass
+# this will never be called
+def terminate(s):
+	s.close()
 
 main()
