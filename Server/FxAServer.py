@@ -49,9 +49,9 @@ def convertPacketArr(packetArr, fileName):
 def getFile(fileNameAndNumber):
 	fileName, numPackets = fileNameAndNumber.split(",")
 	packetArr = RxPServer.receive(numPackets)
-	print("Packet size is: " + `len(packetArr)`)
 	if(len(packetArr)):
 		convertPacketArr(packetArr, fileName)
+		print "Successfully Downloaded file: " + fileName
 	else:
 		print "File could not be downloaded"
 
@@ -70,7 +70,7 @@ def makePacketArr(fileName):
 
 
 def postFile(fileName):
-	print "Name of file is " + fileName
+	print "FXA: Name of file is " + fileName
 	packetArr = makePacketArr(fileName)
 	print("FxAServer is gonan send this many packets: " + `len(packetArr)`)
 	RxPServer.send(packetArr)		
@@ -83,6 +83,7 @@ def usage():
 	print 'A: the IP address of NetEmu'
  	print 'P: the UDP port number of NetEmu'
 	sys.exit(2)
+
 
 def terminate():
 	RxPServer.closeSocket()

@@ -3,8 +3,53 @@ import os.path
 from socket import *
 import RxPClient
 
-status = "NO_CONNECTION"
-PACKETSIZE = 1024
+STATUS = "NO_CONNECTION"
+DATASIZE = 1024
+HOSTPORT = ""
+DESTPORT = ""
+DEST_ADDR = ""
+
+
+def addHeader(packet, sequenceNumber):
+	global C_PORT, DEST_ADDR
+	packet = `C_PORT` + "," + `DEST_ADDR[1]` + "," + `sequenceNumber` + "," + `packet`
+	return packet
+
+def createHeader(packets, fileType):
+  port_number             = hostPort
+  emulator_port_number    = netEmuPort
+  packet_sequence_number  = 0
+  total_packets           = len(packets)
+
+  i = 0
+  final_packets = []
+
+  for packet in packets:
+    header = "" + str(port_number) + "," + str(emulator_port_number) + "," + str(packet_sequence_number) + "," + str(total_packets) + "," + str(isServer) + "," + fileType + "," + str(file_id) + separator;
+
+    packet = header +  str(packet)
+
+    m = md5.new()
+    m.update(packet)
+    checksum = m.hexdigest() #69 bytes = 552 Bits.
+
+    packet = checksum + "," + packet
+
+    final_packets.insert(i,(packet,0))
+    i = i + 1
+
+    packet_sequence_number = 1 + packet_sequence_number
+
+  return final_packets
+
+
+
+def decodeHeader(packet):
+	sourcePort, destPort, sequenceNumber, data = packet.split(',')
+	return eval(sourcePort), eval(destPort), eval(sequenceNumber), data
+
+
+
 
 def main():
 	if len(sys.argv) != 4:
@@ -45,28 +90,29 @@ def usage(errorNum):
  		print 'Please type another command: '
 	
 def rxpConnect(bindport, addr):
-	global status
-	if(status == "NO_CONNECTION"):
+	global STATUS
+	if(STATUS == "NO_CONNECTION"):
 		if(RxPClient.connect(bindport, addr)):
-			status = "CONNECTED"
-			print(status + "connected to server at " + `addr`)
+			STATUS = "CONNECTED"
+			print(STATUS + "connected to server at " + `addr`)
 		else:
 			print "Client could not establish connection"
 	else:
 		print "connection already exists"
 
-def function():
-	pass
 
 def get(fileName):
 	# print "FxC: Name of file is " + fileName
-	global status
-	if(status == "CONNECTED"):
+	global STATUS
+	if(STATUS == "CONNECTED"):
 		packetArr = RxPClient.receive(fileName)
-		print("Packet size is: " + `len(packetArr)`)
-		if(len(packetArr)):
-			convertPacketArr(packetArr, fileName)
-		else:
+		try:
+			if(len(packetArr)):
+				convertPacketArr(packetArr, fileName)
+				print "Successfully Downloaded File: " + fileName
+			else:
+				print "File could not be downloaded"
+		except error:
 			print "File could not be downloaded"
 	else:
 		print("Need to establish a connection first!")
@@ -74,11 +120,11 @@ def get(fileName):
 
 def post(fileName):	
 	print "Name of file is " + fileName
-	global status
-	if(status == "CONNECTED"):
-			packetArr = makePacketArr(fileName)
-			if(packetArr):
-				RxPClient.send(packetArr, fileName)
+	global STATUS
+	if(STATUS == "CONNECTED"):
+			outgoingPacketArr = makePacketArr(fileName)
+			if(outgoingPacketArr):
+				RxPClient.send(outgoingPacketArr, fileName)
 			else:
 				print("The file: '" + fileName + "' could not be located")
 				return
@@ -94,22 +140,21 @@ def convertPacketArr(packetArr, fileName):
 
 def makePacketArr(fileName):
 	packetArr = []
-	global PACKETSIZE
+	global DATASIZE
 	if(not os.path.isfile(fileName)):
 		return packetArr
 	file = open(fileName, 'rb')
-	nxtPkt = file.read(PACKETSIZE)
+	nxtPkt = file.read(DATASIZE)
 	while(nxtPkt):
 		packetArr.append(nxtPkt)
-		nxtPkt = file.read(PACKETSIZE)
+		nxtPkt = file.read(DATASIZE)
 	return packetArr
 
-
-
 def disconnect():
-	global status
-	status = "NO_CONNECTION"
+	global STATUS
+	STATUS = "NO_CONNECTION"
 	RxPClient.closeSockets()
+	print ("Client Connection Closed!")
 
 main()
 
@@ -123,8 +168,8 @@ main()
 
 # def get(fileName, s, addr):
 # 	#can split filename based on "." to get file type for header reasons 
-# 	print("on get the value of status is: " + status)
-# 	if(status == "CONNECTED"):
+# 	print("on get the value of STATUS is: " + STATUS)
+# 	if(STATUS == "CONNECTED"):
 # 		packetArr = makePacketArr(fileName)
 # 		if (not packetArr):
 # 			print("This file does not exist")

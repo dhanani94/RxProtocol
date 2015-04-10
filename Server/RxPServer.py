@@ -3,10 +3,27 @@ from socket import *
 import md5
 
 
-BUFSIZE = 1024
+BUFSIZE = 1024 + 16
 SOCKET = None
 S_PORT = ""
 DEST_ADDR = None
+
+def checkSumCheck(packet):
+	data, checkSum = packet.split("|")
+	message = md5.new()
+	message.update(data)
+	checksumData = message.hexdigest()
+	if(checksumData == checkSum):
+		return data
+	return False
+
+def createChecksumPacket(data):
+	message = md5.new()
+	message.update(data)
+	checksumData = message.hexdigest()
+	dataPacket = data + "|" + checksumData.strip()
+	print "made this checksum" + checksumData
+	return dataPacket
 
 def handshake():
 	global SOCKET, S_PORT, DEST_ADDR
@@ -17,28 +34,26 @@ def handshake():
 			data, clientAddr = SOCKET.recvfrom(BUFSIZE)
 			if data != "":
 				try:
-					data, dataChecksum = data.split("_")
+					data = checkSumCheck(data)
 					print 'client received', `data`, 'from', `clientAddr`
 				except:
 					continue
-				if(compDataSum(data, dataChecksum) and data[:3] == "SYN"):
+				if(data and data[:3] == "SYN"):
 					awaitingSyn = False
 					sendingSynAck = True
 					while sendingSynAck:
 						try:
 							synAckPacket = "SYNACK"
-							synAckCheckSum = createChecksum(synAckPacket)
-							synAckPacket = synAckPacket + "_" + synAckCheckSum
 							sendPacket(synAckPacket, DEST_ADDR, SOCKET)
 							SOCKET.settimeout(1)
 							data, clientAckAddr = SOCKET.recvfrom(BUFSIZE)
 							if (data != "" and clientAddr == clientAckAddr):
 								try:
-									data, dataChecksum = data.split("_")
+									data = checkSumCheck(data)
 									print 'server received', `data`, 'from', `clientAckAddr`
 								except:
 									continue
-								if(compDataSum(data, dataChecksum) and data[:3] == "ACK"):
+								if(data and data[:3] == "ACK"):
 									SOCKET.settimeout(0)
 									sendingSynAck = False
 									connection = True
@@ -67,30 +82,11 @@ def start(bindport, addr):
 		connection = False
 	return connection
 
-
-	
-
-
-	# while 1:
-	# 	data, addr = s.recvfrom(BUFSIZE)
-	# 	print 'server received', `data`, 'from', `addr`
-	# 	if(data == "SYN"):
-	# 		data +="ACK_" + `seqNum`
-	# 		conAddr = addr
-	# 		s.sendto(data, addr)
-	# 	elif(data[:3] == "ACK" and eval(data[4:]) == seqNum):
-	# 		print("successfully conencted to", `conAddr`)
-	# 	elif(data[:3] == "GET"):
-	# 		fileName = data[4:]
-	# 		send(fileName, s, addr)
-	# 	else:
-	# 		print "unknown request"
-
 def listen():
 	SOCKET.settimeout(None)
 	data, clientAddr = SOCKET.recvfrom(BUFSIZE)
+	data = checkSumCheck(data)
 	print("server recieved" + data)
-	# sourcePort, destPort, sequenceNumber, data = decodeHeader(data)
 	if data[:3] == "SYN":
 		handshake()
 	elif data[:4] == "SEND":
@@ -104,94 +100,100 @@ def decodeHeader(packet):
 	sourcePort, destPort, sequenceNumber, data = packet.split(',')
 	return eval(sourcePort), eval(destPort), eval(sequenceNumber), data
 
-def addHeader(packet, sequenceNumber):
-	global C_PORT, DEST_ADDR
-	packet = `C_PORT` + "," + `DEST_ADDR[1]` + "," + `sequenceNumber` + "," + `packet`
-	return packet
+def addHeader(packets, fileType):
+	global S_PORT, DEST_ADDR
+	sequenceNumber  = 0
+	numPackets = len(packets)
+	div = ","
+	rtnPackets = []
+	for packet in packets:
+		header = ""
+		header = header + str(S_PORT) + div
+		header = header + str(DEST_ADDR[1]) + div
+		header = header + sequenceNumber + div
+		header = header + str(numPackets) + div
+		packet = header +  str(packet)
+		rtnPackets.insert(packet)
+		sequenceNumber = 1 + sequenceNumber
+	return rtnPackets
+
+def getHeaderSourcePort(packet):
+	stringArr = packet.split(",")
+	return stringArr[0]
+
+def getHeaderDestAddr(packet):
+	stringArr = packet.split(",")
+	return stringArr[1]
+
+def getHeaderSeqNum(packet):
+	stringArr = packet.split(",")
+	return stringArr[2]
+
+def getHeaderNumPackets(packet):
+	stringArr = packet.split(",")
+	return stringArr[3]
+
+def getHeaderData(packet):
+	stringArr = packet.split(",")
+	return stringArr[4]
 
 
-def compDataSum(data, checkSum):
-	message = md5.new()
-	message.update(data)
-	checksumData = message.hexdigest()
-	if(checksumData == checkSum):
-		return True
-	return False
-
-def createChecksum(data):
-	message = md5.new()
-	message.update(data)
-	checksumData = message.hexdigest()
-	return checksumData
+# def compDataSum(data, checkSum):
+# 	message = md5.new()
+# 	message.update(data)
+# 	checksumData = message.hexdigest()
+# 	if(checksumData == checkSum):
+# 		return True
+# 	return False
 
 def receive(numStr):
 	global SOCKET, DEST_ADDR
 	packets = []
 	numPackets = eval(numStr)
-	# requestPacket = "RECV_" + fileName
-	# requestPacket = addHeader(requestPacket, 0)
-	# sendPacket(requestPacket, DEST_ADDR, SOCKET)
-	# data, serverAddr = SOCKET.recvfrom(BUFSIZE)
-	sendPacket("ACK", DEST_ADDR, SOCKET)
+	ackPacket = "ACK"
+	sendPacket(ackPacket, DEST_ADDR, SOCKET)
 	print("RXPC is gonna receive this many packets: " + `numPackets`)
 	for i in xrange(numPackets):
 		data, serverAddr = SOCKET.recvfrom(BUFSIZE)
+		data = checkSumCheck(data)
 		packets.append(data)
-		sendPacket("ACK", DEST_ADDR, SOCKET)
+		ackPacket = "ACK"
+		sendPacket(ackPacket, DEST_ADDR, SOCKET)
 	return packets
-
-
-# def sendFile(fileName):
-
 
 def send(packetArr):
 	global SOCKET, DEST_ADDR
 	numPackets = len(packetArr)
 	print("this many packets: " + `numPackets`)
-	sendPacket("SENDING_"+`numPackets`, DEST_ADDR, SOCKET)
+	sendingPacket = "SENDING_"+`numPackets`
+	sendPacket(sendingPacket, DEST_ADDR, SOCKET)
 	data, clientAddr = SOCKET.recvfrom(BUFSIZE)
+	data = checkSumCheck(data)
 	if data == "ACK":
-		sendPacket(packetArr.pop(0), DEST_ADDR, SOCKET)
+		SOCKET.sendto(packetArr.pop(0), DEST_ADDR)
+		# sendPacket(packetArr.pop(0), DEST_ADDR, SOCKET)
 		for packet in packetArr:
 			data, clientAddr = SOCKET.recvfrom(BUFSIZE)
+			data = checkSumCheck(data)
 			if data == "ACK":
-				sendPacket(packet, DEST_ADDR, SOCKET)
-	# if data[:3] == "FNF":
+				SOCKET.sendto(packet, DEST_ADDR)
+				# sendPacket(packet, DEST_ADDR, SOCKET)
 
 
 def sendPacket(line, addr, s):
-	print 'client sending', `line`, 'to', `addr`
+	print 'client sending', line, 'to', `addr`
+	packet = createChecksumPacket(line)
+	s.sendto(packet, addr)
+	print packet
+
+def sendPacket2(line, addr, s):
+	# print 'client sending', `line`, 'to', `addr`
+	print type(line)
+	print type(`line`)
+	print line == `line`
 	s.sendto(line, addr)
+	
 
 def closeSocket():
 	SOCKET.close()
 
-
-
-
-	
-
-
-
-
-
-
-# def main():
-# 	if len(sys.argv) > 2:
-# 		port = eval(sys.argv[2])
-# 	else: 
-# 		port = 8081
-# 	# else:
-# 	# 	port = ECHO_PORT
-# 	s = socket(AF_INET, SOCK_DGRAM)
-# 	s.bind(('', port))
-# 	print 'udp echo server ready'
-# 	addr = connect(s)
-# 	data, addr = s.recvfrom(BUFSIZE)
-# 	if(data[:3] == "GET"):
-# 		fileName = data[4:]
-# 		send(fileName, s, addr)
-
-
-# todo: if packet recieved is a "GET fileName",
-#  run code to send filename, wait for ACKS! 
