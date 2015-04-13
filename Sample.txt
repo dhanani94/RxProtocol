@@ -1,0 +1,150 @@
+The README file must contain:
+
+    
+   
+    Your updated protocol and API description with sufficient detail such that
+    somebody else could implement your protocol Any known bugs, limitations of
+    your design or program You will be graded on the correctness of the code and
+    its readability and structure.  As you write the documentation, imagine that
+    I intend to implement your protocol in my own client that will interoperate
+    with your server. Make sure I don't have to read your source code to figure
+    out how to do this.
+
+
+\\\\\\\\\\\\\\\\\\\\\ Project Information ///////////////////////////
+
+Team Members:
+Taufiq Dhanani - Dhanani94@gatech.edu
+Alex O'Connor - Aoconnor7@gatech.edu 
+
+CS 3251 Computer Networks
+Section B
+13th April 2015
+
+Reliable Transport Protocol
+ClientFxA.py ClientRxP.py ServerFxA.py ServerRxP.py
+
+
+\\\\\\\\\\\\ Execution of Client and Server Applications ///////////////
+
+Client          
+	python ClientFxA.py 8080 127.0.0.1 5000                  
+		8080: the Even port (####) for FxA Client socket         
+		127.0.0.1: the IP address (###.###.###.###) of NetEmu                  
+		5000: the UDP port number (####) of NetEmu'
+
+	Commands:   
+		"connect       - To connect to the server"  
+		"pull s1.jpg   - To pull a file from the server"  
+		"push s1.jpg   - To push a file to the server"
+		"window  #     - To change the window size to #"  
+		"disconnect    - To disconnect from the server"
+
+Server          
+	python ServerFxA.py 8081 127.0.0.1 5000         
+		8081: the odd port #### for FxA Server socket         
+		127.0.0.1: the IP address (###.###.###.###) of NetEmu                  
+		5000: the UDP port number (####) of NetEmu'
+
+	Commands: 
+		"start       - To start to the server"  
+		"terminate   - To terminate the server"  
+		"window #    - To change the window size to #"
+
+*Note: 
+	To correctly push a file it should be in the same directory as the client 
+	To correctly pull a file it should be in the same directory as the server 
+\\\\\\\\\\\\ Client RxP Implementation ///////////////
+
+Connect            
+	When connect is called by the client application, this method
+	will ensure that a SOCKET is created and is binded to the port number
+	speciefed. Then, the method will keep on sending SYN packets to the specified
+	NetEMU server. Once it recieves proper SYNACK, the method will send out an ACK
+	and assume that the connection has been established
+
+Receive 
+	The client will ask the Server to "PULL_" + str(filename)
+	If the server responsed with an ACK, the method will start receving data. The rest is underlined below in the basic receive implementation
+
+Send
+	The client will ask the server to "PUSH_" + filename
+	If the server responsed with an ACK, the method will start sending the packets. The rest is outline below in the basic send implementation. The method is called by the client application and a packet buffer (list structure) with headers/checksums/data is created
+
+Close sockets 
+	Tries to call SOCKET.close() if that doesn't work out the socket is probably already closed so no worries 
+
+\\\\\\\\\\\\ Server RxP Implementation ///////////////
+Start
+	When start is called by the server application, a socket will be created and will bind to the port number specified. The handshake is called wich is a helper method
+
+Handshake
+	This is where the TCP- like handshake occurs. Server waits for a SYN and upon recieving one with a good checksum, the server sends a SYNACK message and waits for an ACK. If the ACK is recieved and looks good, then the conection is established 
+
+Listen
+	This is called immediately after "Start" is called by the server application. This method is in a loop. All it does is get data from the socket and return its value if it's a command. The three server commands that we care about are SYN, PUSH, and PULL 
+
+Receive
+	The server will send an ACK to the client before receiving to let the client know that it received its "PUSH" request. Receive is the same as described below, it returns to the server application the data packets data. The receive was called by the application through the listen method with the correct filename being recieved
+
+Send
+	The server will send an ACK to the client before receiving to let the client know that it received its "PULL" request. Send is the same as described below, it sends to the client all the data packets that were passed into by the server Applcation. The receive was called by the application through the listen method with the correct filename being recieved and the server application created a packetbuffer (list with all the data packets with headers and checksums and stuff) to send via this RxP Send method. NOTE: if the packet being sent is of length zero then a NACK packet will be sent!
+
+\\\\\\\\\\\\ Send and Receive Implementation ///////////////
+
+Send
+	The actual sending is done within a while loop that will continue as long as "not all packets are sent" and "number of acks received is less than the number of packets being sent"
+
+	Within this while loop there are two cases
+		Case 1 means the window is not full, this is determined by having a base (the  pointer at the begining of send window) and adding it to the window size. If this number is less than the nextpacket being sent's sequence number, then the window is not full and we can send another packet if there are any remainig. Upon sending the last packet, the boolean marker for sentAll is set to true and the user is notified that all packets have been sent
+		Case 2 means that the window is full and we need to wait for ACKs. This is done by simply reciving from the SOCKET and checking the data. 
+			If the ACK is curropted, drop it (via md5 checksum)
+			If the ACK number is not valid, drop it (check sequencenumber)
+			If the ACK number has already been received, drop it 
+		mark the array entry for the ACK number as true and check for out of orderness 
+Receive 
+	The "meat" of the receive code is done in a whie that will end once all of the of the ACKs have been sent for all the packets and they're all validated. The code asks the socket to recieve data, the data is then checked (if the packet is a SYN Packet it calls handshake() -- only applies to Server). The packet then is checked for its seuqnec number (duplicated or out of order). If duplicate then the packet is dropped, if wrong expected sequence number, then it's placed into another buffer. If the sequence number is matched and the packet is good, it is added to packetbuffer and the expected sequence number is incremented. 
+	out of order buffer eleemetents are checked each round if they contain the expected sequence number, if so they are placed into the packet buffer 
+	The ACKs are sent out for all good packets and ultimately the packetbuffer (a list of all the packet data) is returned 
+
+
+\\\\\\\\\\\\ Helper Functions Implementation ///////////////
+
+Application Layer 
+	convertPacketArr
+		This method opens up a filename to write to by taking in the packetArray provided and a filename. The packet array pops all the data and writes it to the new file. 
+
+	makePacketArr
+		The method creates a packet array and tries to find the file, if it's not found it returns an empty array. If it is found it reads DATASIZE amounts from the file and creates a packet from it.
+
+	createHeader
+		The method takes in the packetarray and adds the header fields. Each resulting packet in the list will look like the following structure: 
+			CHECKSUM, HOSTPORT, DESTPORT, SEQNUM, NUMPACKETS, TYPE | DATA
+
+Transport Layer
+	checksumCheck
+		The method will take in a checksum value and the data to be digested and compared to. The results of this comparison is returned 
+
+	decodeHeader
+		The purpose of this code is to check for validity. The header provided is split and the intger fields are converted to ints, any error here will return a bunch of "falses" to signify a broken header
+
+	sendDataPacket
+		The method will take in packet array and a sequence number. It will send the specified sequence number packet through the socket 
+
+	checkandSend
+		This method takes in a raw data packet (like SYN and ACK and stuff) and adds a checksum to it ands sends it through the socket
+
+
+\\\\\\\\\\\\   Known Bugs     ///////////////
+
+The program doesn't seem to like bit errors that much. Even though the checksum is theoretically supposed to catch these, it does but then the code freaks out and stops execution. 
+
+\\\\\\\\\\\\   Changes from original API     ///////////////
+--Checksum, md5 is used instead of CRC becuase it's easier to implement and ethernet uses CRC. Also this is a very very very good checksum 
+--Sliding Window is implemented as described above in the send/recieve sections
+--Header has been totally modified as described as in the create header method
+	CHECKSUM, HOSTPORT, DESTPORT, SEQNUM, NUMPACKETS, TYPE | DATA
+--The methods for the RxP Server and Client protocols are correctly listed here 
+
+Link to original API: 
+https://docs.google.com/document/d/1nb9QNjHYJhYHMIoJOcPsOQhjWim3Ggal43kYtCg3XhE/edit?usp=sharing

@@ -186,12 +186,12 @@ def sendPacket(line, addr, s):
 	s.sendto(packet, addr)
 	print packet
 
-def sendPacket2(line, addr, s):
-	# print 'client sending', `line`, 'to', `addr`
-	print type(line)
-	print type(`line`)
-	print line == `line`
-	s.sendto(line, addr)
+# def sendPacket2(line, addr, s):
+# 	# print 'client sending', `line`, 'to', `addr`
+# 	print type(line)
+# 	print type(`line`)
+# 	print line == `line`
+# 	s.sendto(line, addr)
 	
 
 def closeSocket():

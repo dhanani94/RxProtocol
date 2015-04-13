@@ -58,14 +58,15 @@ def getFile(fileNameAndNumber):
 
 def makePacketArr(fileName):
 	packetArr = []
-	global PACKETSIZE
+	global DATASIZE
 	if(not os.path.isfile(fileName)):
 		return packetArr
-	file = open(fileName, 'rb')
-	nxtPkt = file.read(PACKETSIZE)
+	reader = open(fileName, 'rb')
+	nxtPkt = reader.read(DATASIZE)
 	while(nxtPkt):
 		packetArr.append(nxtPkt)
-		nxtPkt = file.read(PACKETSIZE)
+		nxtPkt = reader.read(DATASIZE)
+		reader.close()
 	return packetArr
 
 
